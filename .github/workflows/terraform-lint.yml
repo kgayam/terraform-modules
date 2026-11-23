@@ -1,0 +1,59 @@
+name: Terraform Lint
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - name: terraform fmt
+        run: terraform fmt -check -recursive -diff
+
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - name: terraform validate each module and example
+        run: |
+          failed=0
+          for dir in $(find modules examples -name '*.tf' -exec dirname {} \; | sort -u); do
+            echo "::group::Validating $dir"
+            if ! (cd "$dir" && terraform init -backend=false -input=false >/dev/null && terraform validate); then
+              echo "::error::Validation failed in $dir"
+              failed=1
+            fi
+            echo "::endgroup::"
+          done
+          exit $failed
+
+  tflint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: terraform-linters/setup-tflint@v4
+      - name: Init tflint
+        run: tflint --init
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - name: Run tflint
+        run: tflint --recursive --format compact
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run checkov
+        run: |
+          pip install checkov
+          checkov -d modules --framework terraform --compact
