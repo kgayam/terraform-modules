@@ -1,35 +1,32 @@
-resource "aws_s3_bucket" "this" {
-  #checkov:skip=CKV_AWS_18:Access logging not needed for test buckets
-  #checkov:skip=CKV_AWS_144:Cross-region replication not needed for test buckets
-  #checkov:skip=CKV_AWS_145:SSE-S3 is sufficient for test buckets
-  #checkov:skip=CKV2_AWS_61:Lifecycle rules not needed for test buckets
-  #checkov:skip=CKV2_AWS_62:Event notifications not needed for test buckets
-  bucket = var.bucket_name
-  tags   = var.tags
-}
+terraform {
+  required_version = ">= 1.10.0"
 
-resource "aws_s3_bucket_versioning" "this" {
-  bucket = aws_s3_bucket.this.id
-
-  versioning_configuration {
-    status = "Enabled"
-  }
-}
-
-resource "aws_s3_bucket_server_side_encryption_configuration" "this" {
-  bucket = aws_s3_bucket.this.id
-
-  rule {
-    apply_server_side_encryption_by_default {
-      sse_algorithm = "AES256"
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
     }
   }
+
+  backend "s3" {
+    bucket       = "kgayam-tfstate-372461493678"
+    key          = "examples/s3_bucket_good/terraform.tfstate"
+    region       = "us-east-1"
+    use_lockfile = true
+  }
 }
 
-resource "aws_s3_bucket_public_access_block" "this" {
-  bucket                  = aws_s3_bucket.this.id
-  block_public_acls       = true
-  block_public_policy     = true
-  ignore_public_acls      = true
-  restrict_public_buckets = true
+provider "aws" {
+  region = "us-east-1"
+}
+
+module "bucket" {
+  source      = "../../modules/s3_bucket_good"
+  bucket_name = "example-terraform-modules-372461493678"
+  tags        = { Environment = "test" }
+}
+
+output "bucket_arn" {
+  description = "ARN of the example bucket."
+  value       = module.bucket.bucket_arn
 }
